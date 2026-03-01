@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import os
-import time
+import shutil
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional
@@ -64,25 +64,67 @@ class Trade:
         return Trade(**d)
 
 
+class TradeStateLoadError(RuntimeError):
+    pass
+
+
 class TradeTracker:
     def __init__(self, path: str = "data/trades.json") -> None:
         self.path = path
         os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        self.load_meta: Dict[str, Any] = {
+            "path": self.path,
+            "used_backup": False,
+            "load_error": None,
+            "file_missing": False,
+            "last_modified": None,
+        }
         self._trades: List[Trade] = self._load()
 
     def _load(self) -> List[Trade]:
         if not os.path.exists(self.path):
+            self.load_meta["file_missing"] = True
             return []
+        try:
+            self.load_meta["last_modified"] = datetime.fromtimestamp(
+                os.path.getmtime(self.path), timezone.utc
+            ).isoformat()
+        except Exception:
+            self.load_meta["last_modified"] = None
+
         try:
             with open(self.path, "r", encoding="utf-8") as f:
                 raw = json.load(f) or []
+        except Exception as exc:
+            self.load_meta["load_error"] = repr(exc)
+            raise TradeStateLoadError(f"Failed to parse trade state file: {self.path}") from exc
+
+        if not isinstance(raw, list):
+            self.load_meta["load_error"] = "Top-level JSON value must be a list"
+            raise TradeStateLoadError(
+                f"Invalid trade state schema in {self.path}: top-level value must be a list"
+            )
+
+        try:
             return [Trade.from_dict(x) for x in raw]
-        except Exception:
-            return []
+        except Exception as exc:
+            self.load_meta["load_error"] = repr(exc)
+            raise TradeStateLoadError(f"Invalid trade entry schema in {self.path}") from exc
 
     def _save(self) -> None:
-        with open(self.path, "w", encoding="utf-8") as f:
-            json.dump([asdict(t) for t in self._trades], f, ensure_ascii=False, indent=2)
+        payload = [asdict(t) for t in self._trades]
+        tmp_path = f"{self.path}.tmp"
+        bak_path = f"{self.path}.bak"
+
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            json.dump(payload, f, ensure_ascii=False, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
+
+        if os.path.exists(self.path):
+            shutil.copy2(self.path, bak_path)
+
+        os.replace(tmp_path, self.path)
 
     def save(self) -> None:
         self._save()

@@ -93,6 +93,9 @@ class EquityEngine:
         self.prune_applied_trade_ids(now=now, retention_days=14)
 
         for t in closed:
+            if str(getattr(t, "status", "")).upper() != "CLOSED":
+                log.info("equity_apply_skipped trade_id=%s reason=non_closed_status status=%s", t.id, t.status)
+                continue
             tid = str(t.id)
             if tid in st.applied_trade_ids:
                 log.info("equity_apply_skipped trade_id=%s reason=already_applied", t.id)

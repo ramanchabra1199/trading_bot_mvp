@@ -16,7 +16,7 @@ from providers.rss_provider import RSSProvider
 from providers.news_provider_base import UnifiedNewsItem
 from core.event_engine import EventEngine, EventItem, Event
 from core.market_engine import MarketEngine
-from core.trade_tracker import TradeTracker, Trade
+from core.trade_tracker import TradeTracker, Trade, TradeStateTransitionError
 from core.kpi_engine import KPIEngine
 from core.risk_engine import RiskEngine
 from core.equity_engine import EquityEngine
@@ -554,6 +554,22 @@ class NewsEngine:
 
     def _check_tp_sl_and_close_open_trades(self) -> List[Trade]:
         closed: List[Trade] = []
+
+        def _attempt_close(trade: Trade, reason: str, px: float, outcome: str) -> None:
+            try:
+                ct = self.tracker.close(trade.id, reason, px, outcome)
+                if ct:
+                    closed.append(ct)
+            except TradeStateTransitionError as exc:
+                log.warning(
+                    "close_transition_rejected trade_id=%s status=%s attempted_next_state=%s trigger=%s err=%s",
+                    trade.id,
+                    trade.status,
+                    "CLOSED",
+                    reason,
+                    exc,
+                )
+
         for t in self.tracker.list_open():
             inst = self.instruments.get(t.symbol)
             if not inst:
@@ -566,22 +582,14 @@ class NewsEngine:
 
             if t.direction == "BUY":
                 if px >= t.tp:
-                    ct = self.tracker.close(t.id, "tp_hit", px, "TP")
-                    if ct:
-                        closed.append(ct)
+                    _attempt_close(t, "tp_hit", px, "TP")
                 elif px <= t.sl:
-                    ct = self.tracker.close(t.id, "sl_hit", px, "SL")
-                    if ct:
-                        closed.append(ct)
+                    _attempt_close(t, "sl_hit", px, "SL")
             else:
                 if px <= t.tp:
-                    ct = self.tracker.close(t.id, "tp_hit", px, "TP")
-                    if ct:
-                        closed.append(ct)
+                    _attempt_close(t, "tp_hit", px, "TP")
                 elif px >= t.sl:
-                    ct = self.tracker.close(t.id, "sl_hit", px, "SL")
-                    if ct:
-                        closed.append(ct)
+                    _attempt_close(t, "sl_hit", px, "SL")
 
         return closed
 

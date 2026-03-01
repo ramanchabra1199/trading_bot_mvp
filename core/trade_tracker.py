@@ -68,6 +68,10 @@ class TradeStateLoadError(RuntimeError):
     pass
 
 
+class TradeStateTransitionError(RuntimeError):
+    pass
+
+
 class TradeTracker:
     def __init__(self, path: str = "data/trades.json") -> None:
         self.path = path
@@ -128,6 +132,13 @@ class TradeTracker:
 
     def save(self) -> None:
         self._save()
+
+    def _validate_transition(self, old_status: str, new_status: str) -> None:
+        old = str(old_status or "").upper()
+        new = str(new_status or "").upper()
+        if old == "OPEN" and new in {"CLOSED", "EXPIRED"}:
+            return
+        raise TradeStateTransitionError(f"Invalid trade status transition: {old} -> {new}")
 
     def add(self, trade: Trade) -> None:
         self._trades.append(trade)
@@ -198,8 +209,10 @@ class TradeTracker:
 
         return changed
 
-    def expire_due(self) -> List[Trade]:
-        now = _utcnow()
+    def expire_due(self, now: Optional[datetime] = None) -> List[Trade]:
+        now_dt = now or _utcnow()
+        if now_dt.tzinfo is None:
+            now_dt = now_dt.replace(tzinfo=timezone.utc)
         expired: List[Trade] = []
         for t in self._trades:
             if t.status != "OPEN" or not t.expires_at:
@@ -210,7 +223,8 @@ class TradeTracker:
                     exp = exp.replace(tzinfo=timezone.utc)
             except Exception:
                 continue
-            if exp <= now:
+            if exp <= now_dt:
+                self._validate_transition(t.status, "EXPIRED")
                 t.status = "EXPIRED"
                 t.close_reason = "ttl_expired"
                 t.outcome = None
@@ -225,10 +239,7 @@ class TradeTracker:
         for t in self._trades:
             if t.id != trade_id:
                 continue
-            if t.close_at is not None:
-                return t
-            if t.status != "OPEN":
-                return t
+            self._validate_transition(t.status, "CLOSED")
 
             t.status = "CLOSED"
             t.close_reason = reason

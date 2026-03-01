@@ -51,6 +51,11 @@ Decision: **Option A**.
 ## Equity
 
 - Equity apply idempotency uses `applied_trade_ids` with retention/prune of 14 days.
+- Lifecycle + equity boundary contract:
+  - `EXPIRED` is terminal and does not affect equity.
+  - `CLOSED` is terminal and can affect equity via realized PnL.
+  - Allowed transitions: `OPEN -> EXPIRED`, `OPEN -> CLOSED`.
+  - Disallowed transitions: `EXPIRED -> *`, `CLOSED -> *`.
 
 ## Trade State Persistence
 

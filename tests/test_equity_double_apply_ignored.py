@@ -16,6 +16,7 @@ def test_equity_double_apply_ignored(tmp_path, caplog):
         entry=100.0,
         tp=101.0,
         sl=99.0,
+        status="CLOSED",
         pnl_inr=250.0,
     )
 

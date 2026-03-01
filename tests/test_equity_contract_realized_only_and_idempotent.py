@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
+import pytest
+
 from core.equity_engine import EquityEngine
-from core.trade_tracker import Trade, TradeTracker
+from core.trade_tracker import Trade, TradeStateTransitionError, TradeTracker
 
 
 # Prevents regression: equity includes MTM or double-counts PnL on repeated close
@@ -41,10 +43,9 @@ def test_equity_contract_realized_only_and_idempotent(tmp_path):
     eq1 = equity.current_equity()
     assert eq1 == 100060.0
 
-    # Repeated close must be idempotent and not move equity again.
-    closed_again = tracker.close_trade("T1", "tp_hit", 103.0, "TP")
-    assert closed_again is not None
-    equity.apply_closed_trades([closed_again])
+    # Repeated close must fail loudly under terminal-state contract.
+    with pytest.raises(TradeStateTransitionError):
+        tracker.close_trade("T1", "tp_hit", 103.0, "TP")
     assert equity.current_equity() == eq1
 
     # Repeated reads are side-effect free.

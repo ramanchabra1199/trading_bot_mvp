@@ -3,6 +3,7 @@ import json
 import logging
 from logging.handlers import RotatingFileHandler
 from typing import Dict, Any, List, Optional, Tuple
+from datetime import datetime, timezone
 
 import yaml
 from dotenv import load_dotenv
@@ -21,6 +22,7 @@ TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
 SUBSCRIBERS_PATH = "data/subscribers.json"
 AUTO_JOB_NAME = "auto_news_job"
+STARTUP_EXPIRED_ON_BOOT = 0
 
 
 def load_config(path: str = "config.yml") -> dict:
@@ -216,6 +218,49 @@ def _read_kpi_state() -> Tuple[int, int, int, float]:
 
 def _kpi_changed(before: Tuple[int, int, int, float], after: Tuple[int, int, int, float]) -> bool:
     return before != after
+
+
+def _startup_trade_state_text(expired_on_boot: int) -> str:
+    total = len(getattr(tracker, "_trades", []))
+    open_count = len(tracker.list_open())
+    path = getattr(tracker, "path", "data/trades.json")
+    meta = getattr(tracker, "load_meta", {}) or {}
+    last_modified = meta.get("last_modified")
+    used_backup = bool(meta.get("used_backup", False))
+    load_error = meta.get("load_error")
+
+    try:
+        if (not last_modified) and os.path.exists(path):
+            last_modified = datetime.fromtimestamp(os.path.getmtime(path), timezone.utc).isoformat()
+    except Exception:
+        last_modified = None
+
+    return (
+        "startup_trades_loaded "
+        f"total={total} open={open_count} expired_on_boot={expired_on_boot} "
+        f"file={path} last_modified={last_modified or 'unknown'} "
+        f"used_backup={used_backup} load_error={load_error or 'none'}"
+    )
+
+
+def _log_startup_trade_state(expired_on_boot: int) -> str:
+    msg = _startup_trade_state_text(expired_on_boot)
+    logging.info(msg)
+    return msg
+
+
+async def startup_integrity_job(context: ContextTypes.DEFAULT_TYPE) -> None:
+    data = _load_subscribers()
+    chat_ids = [int(x) for x in data.get("chat_ids", [])]
+    if not chat_ids:
+        return
+
+    msg = _startup_trade_state_text(expired_on_boot=STARTUP_EXPIRED_ON_BOOT)
+    for cid in chat_ids:
+        try:
+            await context.bot.send_message(chat_id=cid, text=msg)
+        except Exception as e:
+            logging.warning("startup_integrity_alert_failed chat_id=%s err=%s", cid, e)
 
 
 def _has_any_actions(r) -> bool:
@@ -525,10 +570,16 @@ async def unknown(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 def main():
+    global STARTUP_EXPIRED_ON_BOOT
     setup_logging()
 
     if not TOKEN:
         raise RuntimeError("TELEGRAM_BOT_TOKEN is missing in .env")
+
+    STARTUP_EXPIRED_ON_BOOT = len(tracker.expire_due())
+    startup_msg = _log_startup_trade_state(expired_on_boot=STARTUP_EXPIRED_ON_BOOT)
+    if STARTUP_EXPIRED_ON_BOOT:
+        logging.info("startup_expire_due_applied count=%s", STARTUP_EXPIRED_ON_BOOT)
 
     app = Application.builder().token(TOKEN).build()
 
@@ -546,6 +597,8 @@ def main():
     app.add_error_handler(on_error)
 
     ensure_auto_job(app)
+    app.job_queue.run_once(startup_integrity_job, when=1, name="startup_integrity_job")
+    logging.info("startup_integrity_alert_scheduled message=%s", startup_msg)
 
     app.run_polling(close_loop=False)
 

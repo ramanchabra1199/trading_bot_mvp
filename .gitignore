@@ -1,0 +1,12 @@
+# Runtime state / artifacts
+data/*.json
+!data/trades.example.json
+logs/
+__pycache__/
+*.pyc
+
+# Local env
+.venv/
+venv/
+.env
+.env.*

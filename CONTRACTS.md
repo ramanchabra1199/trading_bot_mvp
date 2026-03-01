@@ -52,6 +52,12 @@ Decision: **Option A**.
 
 - Equity apply idempotency uses `applied_trade_ids` with retention/prune of 14 days.
 
+## Trade State Persistence
+
+- Load policy: fail fast on `data/trades.json` parse/schema errors (bot startup should halt).
+- Save policy: write `data/trades.json.tmp` + fsync, copy current file to `data/trades.json.bak`, then atomic replace to `data/trades.json`.
+- Recovery policy: no automatic fallback to `.bak` during load; if load fails, operator may manually replace `trades.json` with `trades.json.bak`.
+
 ## Quantity Rounding
 
 - Rounding mode used by risk sizing: `floor`.

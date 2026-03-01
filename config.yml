@@ -1,0 +1,217 @@
+mvp:
+  timezone: "Asia/Kolkata"
+
+news_provider:
+  max_age_minutes: 240
+
+news:
+  feeds:
+    FXStreet: "https://www.fxstreet.com/rss/news"
+    Investing_Global: "https://www.investing.com/rss/news_301.rss"
+    Investing_India: "https://in.investing.com/rss/news_25.rss"
+
+  confirm_window_minutes: 30
+  similarity_threshold: 0.28
+  upgrade_extend_ttl_minutes: 240
+  max_open_per_category: 3
+
+  categories:
+
+    # ---- INDIA MACRO / RBI ----
+    india_policy:
+      any_keywords:
+        - "rbi"
+        - "sebi"
+        - "india policy"
+        - "budget"
+        - "gst"
+        - "import duty"
+        - "tariff"
+        - "trade policy"
+        - "finance ministry"
+
+    # ---- GLOBAL RATES / USD ----
+    rates_macro:
+      any_keywords:
+        - "fed"
+        - "fomc"
+        - "interest rate"
+        - "rate hike"
+        - "rate cut"
+        - "inflation"
+        - "cpi"
+        - "ppi"
+        - "jobs"
+        - "nfp"
+        - "yield"
+        - "treasury"
+        - "dollar"
+        - "greenback"
+
+    # ---- USD / INR SPECIFIC ----
+    fx_usdinr:
+      any_keywords:
+        - "usd/inr"
+        - "usdinr"
+        - "rupee"
+        - "inr"
+
+    # ---- GOLD / OIL / COMMODITIES ----
+    commodities_gold_oil:
+      any_keywords:
+        - "gold"
+        - "bullion"
+        - "crude"
+        - "oil"
+        - "brent"
+        - "wti"
+        - "opec"
+        - "supply disruption"
+
+    # ---- GEOPOLITICS ----
+    geopolitics:
+      any_keywords:
+        - "war"
+        - "attack"
+        - "missile"
+        - "invasion"
+        - "sanctions"
+        - "nuclear"
+        - "strike"
+        - "airstrike"
+        - "military"
+
+    # ---- GLOBAL EQUITIES HEADLINES (to avoid [unknown]) ----
+    equities_global:
+      any_keywords:
+        - "stock"
+        - "stocks"
+        - "shares"
+        - "52-week"
+        - "52 week"
+        - "52-week high"
+        - "52-week low"
+        - "market cap"
+        - "ipo"
+        - "nasdaq"
+        - "nyse"
+        - "dow"
+        - "s&p"
+        - "s&p 500"
+
+    # ---- EARNINGS (to avoid [unknown]) ----
+    earnings:
+      any_keywords:
+        - "earnings"
+        - "eps"
+        - "revenue"
+        - "guidance"
+        - "quarter"
+        - "q1"
+        - "q2"
+        - "q3"
+        - "q4"
+
+risk:
+  equity_inr: 100000
+  risk_pct_per_trade: 0.01
+  max_portfolio_risk_pct: 0.03
+  max_factor_trades: 1
+
+# -------------------------
+# INSTRUMENT DEFINITIONS
+# -------------------------
+
+instruments:
+
+  USDINR:
+    yfinance_symbol: "USDINR=X"
+    point_value_inr: 1
+    lot_step: 1
+    lot_min: 1
+    atr_low_pct: 0.05
+    atr_high_pct: 2.50
+    factors: ["USD", "INR"]
+    tier: 1
+
+  GOLD:
+    yfinance_symbol: "GC=F"
+    point_value_inr: 1
+    lot_step: 1
+    lot_min: 1
+    atr_low_pct: 0.05
+    atr_high_pct: 4.00
+    factors: ["GOLD", "USD"]
+    tier: 1
+
+  NIFTY:
+    yfinance_symbol: "^NSEI"
+    point_value_inr: 1
+    lot_step: 1
+    lot_min: 1
+    atr_low_pct: 0.10
+    atr_high_pct: 4.00
+    factors: ["INDIA_EQ"]
+    tier: 1
+
+  BANKNIFTY:
+    yfinance_symbol: "^NSEBANK"
+    point_value_inr: 1
+    lot_step: 1
+    lot_min: 1
+    atr_low_pct: 0.10
+    atr_high_pct: 5.00
+    factors: ["INDIA_EQ"]
+    tier: 1
+
+# -------------------------
+# CATEGORY → TRADE MAPPING
+# -------------------------
+
+trades:
+
+  india_policy:
+    symbol: "USDINR"
+    direction: "BUY"
+    create_score: 1
+    confirm_score: 3
+    min_rr: 2.0
+
+  rates_macro:
+    symbol: "USDINR"
+    direction: "BUY"
+    create_score: 1
+    confirm_score: 3
+    min_rr: 2.0
+
+  fx_usdinr:
+    symbol: "USDINR"
+    direction: "BUY"
+    create_score: 1
+    confirm_score: 3
+    min_rr: 2.0
+
+  commodities_gold_oil:
+    symbol: "GOLD"
+    direction: "BUY"
+    create_score: 1
+    confirm_score: 3
+    min_rr: 2.0
+
+  geopolitics:
+    symbol: "GOLD"
+    direction: "BUY"
+    create_score: 3
+    confirm_score: 6
+    min_rr: 2.0
+
+  # NOTE: These are categorized but NOT mapped to trades yet (prevents noise trades).
+  equities_global:
+    symbol: ""
+    direction: "BUY"
+
+  earnings:
+    symbol: ""
+    direction: "BUY"
+
+tier2: {}

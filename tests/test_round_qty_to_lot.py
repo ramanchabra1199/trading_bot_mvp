@@ -44,3 +44,7 @@ def test_round_qty_to_lot_modes_and_wiring():
     assert dec.qty_raw > dec.qty_rounded
     assert dec.lots == dec.qty_rounded
     assert dec.rounding_applied is True
+
+
+def test_intentional_ci_failure():
+    assert False
